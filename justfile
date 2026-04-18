@@ -1,6 +1,7 @@
 set dotenv-load
 
 export CARGO_MSG_LIMIT := '1'
+export TENANT := env_var_or_default("asdf","sdf")
 
 export AR := if os() == 'macos' {
   shell('rustc --print sysroot') / 'lib/rustlib' / arch() + '-apple-darwin/bin/llvm-ar'
@@ -14,6 +15,8 @@ default:
 alias f := fmt
 alias r := run
 alias t := test
+
+
 
 all: build test clippy fmt-check
 
@@ -51,9 +54,14 @@ fmt-web:
 fmt-check:
   cargo fmt --all -- --check
 
-[group: 'check']
+
+[group: 'dev']
 forbid:
   ./bin/forbid
+
+[group: 'check']
+testme:
+  env_var_or_default("a", "b")
 
 [group: 'dev']
 install:

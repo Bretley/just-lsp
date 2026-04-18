@@ -1,4 +1,7 @@
+use std::borrow::Cow;
+
 use super::*;
+use tower_lsp::lsp_types::{CodeActionKind, CodeActionOptions, CodeActionOrCommand, WorkspaceEdit};
 
 pub(crate) struct Server(Arc<Inner>);
 
@@ -10,13 +13,27 @@ impl Debug for Server {
 
 impl Server {
   pub(crate) fn capabilities() -> lsp::ServerCapabilities {
+    let mut capabilities = Vec::new();
+    capabilities.push(CodeActionKind::QUICKFIX);
     lsp::ServerCapabilities {
       completion_provider: Some(lsp::CompletionOptions {
         ..Default::default()
       }),
+      /*
       code_action_provider: Some(lsp::CodeActionProviderCapability::Simple(
         true,
       )),
+      */
+      code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
+        CodeActionOptions {
+          code_action_kinds: Some(capabilities),
+          work_done_progress_options: lsp::WorkDoneProgressOptions {
+            work_done_progress: Some(false),
+          },
+          resolve_provider: Some(false),
+        },
+      )),
+
       code_lens_provider: Some(lsp::CodeLensOptions {
         resolve_provider: Some(false),
       }),
@@ -270,6 +287,7 @@ impl Inner {
         let parameters = serde_json::to_value(parameters)
           .map_err(|_| jsonrpc::Error::parse_error())?;
 
+
         actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
           title: recipe.name.value.clone(),
           kind: Some(lsp::CodeActionKind::SOURCE),
@@ -280,6 +298,55 @@ impl Inner {
           }),
           ..Default::default()
         }));
+      }
+
+      /* Copied from analyzer.rs, initially */
+
+      let context = RuleContext::new(document);
+
+      let default = Config::default();
+
+      let config = default.clone(); //self.config.unwrap_or(&default);
+
+      let diagnostics = inventory::iter::<&dyn Rule>
+        .into_iter()
+        .flat_map(|rule| {
+          rule
+            .run(&context)
+            .into_iter()
+            .filter_map(|diagnostic| {
+              let rule_config = config.rule_config(rule.id());
+
+              Some(Diagnostic {
+                id: rule.id().to_string(),
+                display: rule.message().to_string(),
+                severity: rule_config.severity(diagnostic.severity)?,
+                ..diagnostic
+              })
+            })
+        })
+        .collect::<Vec<_>>();
+
+      let maybe_idx = diagnostics.iter().position(| diag | diag.id == "deprecated-function");
+      match maybe_idx {
+        None => (),
+        Some(idx) => {
+          if let Some(diag) = diagnostics.get(idx) {
+            let my_diag = lsp::Diagnostic::from(diag.clone());
+
+            actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+              title: diag.message.clone(),
+              kind: Some(lsp::CodeActionKind::QUICKFIX),
+              diagnostics: Some(vec![my_diag]),
+              edit: Some(WorkspaceEdit {
+                // TODO: figur
+                ..Default::default()
+              }),
+              ..Default::default()
+            }));
+          }
+        }
+
       }
 
       return Ok(Some(actions));
