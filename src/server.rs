@@ -1,7 +1,7 @@
-use std::borrow::Cow;
+use std::{alloc::GlobalAlloc, borrow::Cow, hash::RandomState};
 
 use super::*;
-use tower_lsp::lsp_types::{CodeActionKind, CodeActionOptions, CodeActionOrCommand, WorkspaceEdit};
+use tower_lsp::lsp_types::{CodeActionKind, CodeActionOptions, CodeActionOrCommand, MessageActionItem, TextEdit, Url, WorkspaceEdit};
 
 pub(crate) struct Server(Arc<Inner>);
 
@@ -15,6 +15,8 @@ impl Server {
   pub(crate) fn capabilities() -> lsp::ServerCapabilities {
     let mut capabilities = Vec::new();
     capabilities.push(CodeActionKind::QUICKFIX);
+    capabilities.push(CodeActionKind::SOURCE);
+    capabilities.push(CodeActionKind::SOURCE_FIX_ALL);
     lsp::ServerCapabilities {
       completion_provider: Some(lsp::CompletionOptions {
         ..Default::default()
@@ -28,9 +30,9 @@ impl Server {
         CodeActionOptions {
           code_action_kinds: Some(capabilities),
           work_done_progress_options: lsp::WorkDoneProgressOptions {
-            work_done_progress: Some(false),
+            work_done_progress: Some(true),
           },
-          resolve_provider: Some(false),
+          resolve_provider: Some(true),
         },
       )),
 
@@ -334,15 +336,23 @@ impl Inner {
           if let Some(diag) = diagnostics.get(idx) {
             let my_diag = lsp::Diagnostic::from(diag.clone());
 
-            actions.push(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-              title: diag.message.clone(),
+            let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
+            changes.insert(uri.clone(),vec![
+              TextEdit {
+                range: my_diag.range,
+                new_text: "env".to_string(),
+              }
+            ]);
+
+            actions.insert(0,lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+              title: "udpate-function".to_string(),
               kind: Some(lsp::CodeActionKind::QUICKFIX),
               diagnostics: Some(vec![my_diag]),
               edit: Some(WorkspaceEdit {
-                // TODO: figur
+                changes: Some(changes),
                 ..Default::default()
-              }),
-              ..Default::default()
+            }),
+              command: None,               ..Default::default()
             }));
           }
         }
@@ -476,7 +486,6 @@ impl Inner {
 
       return Ok(Some(lsp::CompletionResponse::Array(completion_items)));
     }
-
     Ok(None)
   }
 
@@ -735,6 +744,7 @@ impl Inner {
           let recipe_arguments = Vec::new();
 
           if !parameters.is_empty() {
+            let _ =
             self.client.show_message(
               lsp::MessageType::WARNING,
               "Running a recipe code action with parameters is not yet supported."
@@ -746,6 +756,21 @@ impl Inner {
 
           self.run_recipe(recipe_name, recipe_arguments, path).await;
         }
+      }
+      Ok(Command::UpdateFunction) => {
+        let command = params.command;
+
+        let actions =vec![MessageActionItem {
+          title: "Update Fn".to_string(),
+          properties: HashMap::new(),
+        }];
+        let _ =
+        self
+          .client
+          .show_message_request(lsp::MessageType::WARNING, Command::UpdateFunction, Some(actions))
+          .await;
+        return Ok(None);
+        // return Ok(Some(serde_json::from_value(commands);
       }
       Err(error) => {
         self

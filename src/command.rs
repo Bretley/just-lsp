@@ -1,8 +1,11 @@
+use tower_lsp::lsp_types::CodeAction;
+
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Command {
   RunRecipe,
+  UpdateFunction,
 }
 
 impl Command {
@@ -18,6 +21,7 @@ impl Display for Command {
       "{}",
       match self {
         Command::RunRecipe => "just-lsp.run_recipe",
+        Command::UpdateFunction => "just-lsp.update_function"
       }
     )
   }
@@ -29,6 +33,7 @@ impl TryFrom<&str> for Command {
   fn try_from(value: &str) -> Result<Self, Self::Error> {
     match value {
       "just-lsp.run_recipe" => Ok(Command::RunRecipe),
+      "just_lsp.update_function" => Ok(Command::UpdateFunction),
       _ => Err(anyhow!("Unknown command: {value}")),
     }
   }
