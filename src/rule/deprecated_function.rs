@@ -16,11 +16,13 @@ define_rule! {
           ..
         }) = context.builtin_function(function_name.as_str())
         {
-          diagnostics.push(Diagnostic::warning(
+          diagnostics.push(Diagnostic::deprecated_fn_warning(
             format!(
               "`{function_name}` is deprecated, use `{replacement}` instead"
             ),
             function_call.name.range,
+            format!("{replacement}"),
+
           ));
         }
       }

@@ -1,7 +1,16 @@
+
 set dotenv-load
 
 export CARGO_MSG_LIMIT := '1'
 export VAR := env_var_or_default("asdf","sdf")
+
+export VAR2 := env_var_or_default("asdf","sdf")
+
+export VAR3 := env_var_or_default("asdf","sdf")
+
+
+
+
 
 
 

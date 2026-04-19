@@ -14,12 +14,13 @@ define_rule! {
           ..
         }) = context.builtin_setting(&setting.name)
         {
-          diagnostics.push(Diagnostic::warning(
+          let setting_name = setting.name.clone();
+          diagnostics.push(Diagnostic::deprecated_fn_warning(
             format!(
-              "`{}` is deprecated, use `{replacement}` instead",
-              setting.name
+              "`{setting_name}` is deprecated, use `{replacement}` instead"
             ),
             setting.range,
+            format!("set {replacement}"),
           ));
         }
       }

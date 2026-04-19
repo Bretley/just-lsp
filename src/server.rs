@@ -1,7 +1,7 @@
 use std::{alloc::GlobalAlloc, borrow::Cow, hash::RandomState};
 
 use super::*;
-use tower_lsp::lsp_types::{CodeActionKind, CodeActionOptions, CodeActionOrCommand, MessageActionItem, TextEdit, Url, WorkspaceEdit};
+use tower_lsp::lsp_types::{CodeActionKind, CodeActionOptions, CodeActionOrCommand, MessageActionItem, MessageType, TextEdit, Url, WorkspaceEdit};
 
 pub(crate) struct Server(Arc<Inner>);
 
@@ -321,43 +321,39 @@ impl Inner {
 
               Some(Diagnostic {
                 id: rule.id().to_string(),
-                display: rule.message().to_string(),
                 severity: rule_config.severity(diagnostic.severity)?,
+                message: rule.message().to_string(),
                 ..diagnostic
               })
             })
         })
         .collect::<Vec<_>>();
 
-      let maybe_idx = diagnostics.iter().position(| diag | diag.id == "deprecated-function");
-      match maybe_idx {
-        None => (),
-        Some(idx) => {
-          if let Some(diag) = diagnostics.get(idx) {
-            let my_diag = lsp::Diagnostic::from(diag.clone());
-
+      let deprecated_fns = diagnostics.iter().filter(|diag| diag.id.contains("deprecated"));
+      deprecated_fns.for_each(|diag| {
+        if params.range.start >= diag.range.start && params.range.start <= diag.range.end {
             let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
+            let lsp_diag = lsp::Diagnostic::from(diag.clone());
             changes.insert(uri.clone(),vec![
               TextEdit {
-                range: my_diag.range,
-                new_text: "env".to_string(),
+                range: diag.range,
+                new_text: diag.display.clone(),
               }
             ]);
 
             actions.insert(0,lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
-              title: "udpate-function".to_string(),
+              title: format!("update to {}", diag.display),
               kind: Some(lsp::CodeActionKind::QUICKFIX),
-              diagnostics: Some(vec![my_diag]),
+              diagnostics: Some(vec![lsp_diag]),
               edit: Some(WorkspaceEdit {
                 changes: Some(changes),
                 ..Default::default()
             }),
-              command: None,               ..Default::default()
+              command: None,
+              ..Default::default()
             }));
           }
-        }
-
-      }
+      });
 
       return Ok(Some(actions));
     }
@@ -758,7 +754,6 @@ impl Inner {
         }
       }
       Ok(Command::UpdateFunction) => {
-        let command = params.command;
 
         let actions =vec![MessageActionItem {
           title: "Update Fn".to_string(),
@@ -991,10 +986,11 @@ impl Inner {
       match documents.get(uri) {
         Some(document) => {
           let analyzer = Analyzer::from(document).config(&config);
+          let analysis  = analyzer.analyze();
 
           (
-            analyzer
-              .analyze()
+            analysis
+              .diagnostics
               .into_iter()
               .map(lsp::Diagnostic::from)
               .collect(),
@@ -1005,10 +1001,13 @@ impl Inner {
       }
     };
 
+
+
     self
       .client
       .publish_diagnostics(uri.clone(), diagnostics, Some(version))
       .await;
+
   }
 
   async fn references(

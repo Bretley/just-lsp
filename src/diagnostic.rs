@@ -1,3 +1,5 @@
+use std::ptr::replace;
+
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -48,5 +50,14 @@ impl Diagnostic {
 
   pub fn warning(message: impl Into<String>, range: lsp::Range) -> Self {
     Self::new(message, range, lsp::DiagnosticSeverity::WARNING)
+  }
+  pub fn deprecated_fn_warning(message: impl Into<String>, range: lsp::Range, replacement: String) -> Self {
+    Self {
+        display: replacement,
+        id: "deprecated-function".to_string(),
+        message: message.into(),
+        range,
+        severity: lsp::DiagnosticSeverity::WARNING
+    }
   }
 }

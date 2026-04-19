@@ -1,3 +1,5 @@
+use tower_lsp::lsp_types::CodeActionOrCommand;
+
 use super::*;
 
 #[derive(Debug)]
@@ -14,6 +16,27 @@ impl<'a> From<&'a Document> for Analyzer<'a> {
     }
   }
 }
+pub struct Analysis {
+  pub diagnostics: Vec<Diagnostic>,
+  pub actions: Vec<lsp::CodeActionOrCommand>,
+}
+
+pub enum AnalyzerResult {
+  Diagnostic(Diagnostic),
+  CodeAction(lsp::CodeActionOrCommand),
+}
+
+impl From<&CodeActionOrCommand> for AnalyzerResult {
+  fn from(result: &CodeActionOrCommand) -> Self {
+    AnalyzerResult::CodeAction(result.to_owned())
+  }
+}
+
+impl<'a> From<&Diagnostic> for AnalyzerResult {
+  fn from(result: &Diagnostic) -> Self {
+    AnalyzerResult::Diagnostic(result.to_owned())
+  }
+}
 
 impl<'a> Analyzer<'a> {
   /// Run all registered rules against the document.
@@ -22,7 +45,7 @@ impl<'a> Analyzer<'a> {
   /// config can suppress individual rules entirely. Diagnostics are
   /// sorted by position then message for deterministic output.
   #[must_use]
-  pub fn analyze(&self) -> Vec<Diagnostic> {
+  pub fn analyze(&self) -> Analysis {
     let context = RuleContext::new(self.document);
 
     let default = Config::default();
@@ -46,7 +69,7 @@ impl<'a> Analyzer<'a> {
             })
           })
       })
-      .collect::<Vec<_>>();
+      .collect::<Vec<Diagnostic>>();
 
     diagnostics.sort_by(|a, b| {
       a.range
@@ -57,7 +80,40 @@ impl<'a> Analyzer<'a> {
         .then_with(|| a.message.cmp(&b.message))
     });
 
-    diagnostics
+    /* diagnostics; */
+
+    /* This should be separated into its own fn(Diagnostic) maybe` */
+    let mut actions = Vec::new();
+    let maybe_idx = diagnostics.iter().position(| diag | diag.id == "deprecated-function");
+    match maybe_idx {
+      None => (),
+      Some(idx) => {
+        if let Some(diag) = diagnostics.get(idx) {
+          let my_diag = lsp::Diagnostic::from(diag.clone());
+
+          let mut changes: HashMap<lsp::Url, Vec<lsp::TextEdit>> = HashMap::new();
+          changes.insert(self.document.uri.clone(), vec![
+            lsp::TextEdit {
+              range: my_diag.range,
+              new_text: "env".to_string(),
+            }
+          ]);
+
+          actions.insert(0,lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+            title: "udpate-function".to_string(),
+            kind: Some(lsp::CodeActionKind::QUICKFIX),
+            diagnostics: Some(vec![my_diag]),
+            edit: Some(lsp::WorkspaceEdit {
+              changes: Some(changes),
+              ..Default::default()
+            }),
+            command: None,
+            ..Default::default()
+          }));
+        }
+      }
+    }
+    return Analysis { diagnostics, actions };
   }
 
   /// Set the config for rule severity overrides.
@@ -156,6 +212,7 @@ mod tests {
 
       let diagnostics = analyzer
         .analyze()
+        .diagnostics
         .into_iter()
         .map(lsp::Diagnostic::from)
         .collect::<Vec<lsp::Diagnostic>>();

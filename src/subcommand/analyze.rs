@@ -39,15 +39,16 @@ impl Analyze {
     })?;
 
     let analyzer = Analyzer::from(&document);
-
-    let diagnostics = analyzer.analyze();
+    let analysis = analyzer.analyze();
+    let diagnostics = analysis.diagnostics;
 
     if diagnostics.is_empty() {
       return Ok(());
     }
 
     let any_error = diagnostics.iter().any(|diagnostic| {
-      matches!(diagnostic.severity, lsp::DiagnosticSeverity::ERROR)
+      return false;
+      //matches!(AnalyzerResult::Diagnostic(diagnostic).severity, lsp::DiagnosticSeverity::ERROR)
     });
 
     let source_id = path.to_string_lossy().to_string();

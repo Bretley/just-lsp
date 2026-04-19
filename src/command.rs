@@ -21,7 +21,7 @@ impl Display for Command {
       "{}",
       match self {
         Command::RunRecipe => "just-lsp.run_recipe",
-        Command::UpdateFunction => "just-lsp.update_function"
+        Command::UpdateFunction => "just-lsp.update_function",
       }
     )
   }
@@ -34,7 +34,7 @@ impl TryFrom<&str> for Command {
     match value {
       "just-lsp.run_recipe" => Ok(Command::RunRecipe),
       "just_lsp.update_function" => Ok(Command::UpdateFunction),
-      _ => Err(anyhow!("Unknown command: {value}")),
+      _ => Err(anyhow!("Unknown command: {value}"))
     }
   }
 }
