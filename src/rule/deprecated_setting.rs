@@ -19,8 +19,8 @@ define_rule! {
             format!(
               "`{setting_name}` is deprecated, use `{replacement}` instead"
             ),
-            setting.range,
-            format!("set {replacement}"),
+            setting.name_range,
+            format!("{replacement}"),
           ));
         }
       }

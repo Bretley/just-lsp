@@ -20,7 +20,7 @@ define_rule! {
             format!(
               "`{function_name}` is deprecated, use `{replacement}` instead"
             ),
-            function_call.name.range,
+            function_call.range,
             format!("{replacement}"),
 
           ));

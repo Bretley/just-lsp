@@ -1,5 +1,8 @@
 
 set dotenv-load
+set windows-powershell
+
+
 
 export CARGO_MSG_LIMIT := '1'
 export VAR := env_var_or_default("asdf","sdf")

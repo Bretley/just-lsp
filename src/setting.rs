@@ -32,6 +32,7 @@ impl PartialEq for SettingKind {
 pub struct Setting {
   pub kind: SettingKind,
   pub name: String,
+  pub name_range: lsp::Range,
   pub range: lsp::Range,
 }
 
@@ -41,6 +42,7 @@ impl Setting {
     let range = node.get_range(document);
 
     let name = document.get_node_text(&node.child(1)?);
+    let name_range = node.child(1)?.get_range(document);
 
     let mut cursor = node.walk();
 
@@ -69,7 +71,7 @@ impl Setting {
       return None;
     };
 
-    Some(Setting { kind, name, range })
+    Some(Setting { kind, name, name_range, range })
   }
 }
 
